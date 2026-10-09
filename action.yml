@@ -13,6 +13,10 @@ inputs:
     description: Version that was deployed.
     required: false
     default: ""
+  environment:
+    description: Environment that was deployed to (e.g. dev, test, prod). Defaults to the deployment environment when triggered by a deployment event.
+    required: false
+    default: ""
   status:
     description: Deployment status (success, failure, cancelled). Defaults to job.status.
     required: false
@@ -31,6 +35,7 @@ runs:
         WEBHOOK_URL: ${{ inputs.webhook-url }}
         APP_NAME: ${{ inputs.app-name || github.event.repository.name }}
         VERSION: ${{ inputs.version }}
+        ENVIRONMENT: ${{ inputs.environment || github.event.deployment.environment }}
         STATUS: ${{ inputs.status || job.status }}
         DETAILS: ${{ inputs.details }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -48,21 +53,22 @@ runs:
         esac
 
         TITLE="$ICON Utrulling av *$APP_NAME*"
-        if [ -n "$VERSION" ]; then TITLE="$TITLE \`$VERSION\`"; fi
+        TEXT="Utrulling av $APP_NAME"
+        if [ -n "$VERSION" ]; then TITLE="$TITLE \`$VERSION\`"; TEXT="$TEXT $VERSION"; fi
+        if [ -n "$ENVIRONMENT" ]; then TITLE="$TITLE til *$ENVIRONMENT*"; TEXT="$TEXT til $ENVIRONMENT"; fi
         TITLE="$TITLE: *$STATUS_TEXT*"
+        TEXT="$TEXT: $STATUS_TEXT"
 
         PAYLOAD="$(jq -n \
           --arg color "$COLOR" \
           --arg title "$TITLE" \
+          --arg text "$TEXT" \
           --arg details "$DETAILS" \
-          --arg app "$APP_NAME" \
-          --arg version "$VERSION" \
-          --arg status "$STATUS_TEXT" \
           --arg run_url "$RUN_URL" \
           --arg actor "$GITHUB_ACTOR" \
           --arg ref "$GITHUB_REF_NAME" \
           '{
-            text: "Utrulling av \($app) \($version): \($status)",
+            text: $text,
             attachments: [{
               color: $color,
               blocks: (
