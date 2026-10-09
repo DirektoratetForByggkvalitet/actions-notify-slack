@@ -1,0 +1,78 @@
+name: Slack notify deployment
+description: Sends a deployment status notification to a Slack incoming webhook.
+
+inputs:
+  webhook-url:
+    description: Slack incoming webhook URL. Pass it from a secret.
+    required: true
+  app-name:
+    description: Name of the deployed application. Defaults to the repository name.
+    required: false
+    default: ""
+  version:
+    description: Version that was deployed.
+    required: false
+    default: ""
+  status:
+    description: Deployment status (success, failure, cancelled). Defaults to job.status.
+    required: false
+    default: ""
+  details:
+    description: Free-text details to include in the message (Slack mrkdwn supported).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Send Slack notification
+      shell: bash
+      env:
+        WEBHOOK_URL: ${{ inputs.webhook-url }}
+        APP_NAME: ${{ inputs.app-name || github.event.repository.name }}
+        VERSION: ${{ inputs.version }}
+        STATUS: ${{ inputs.status || job.status }}
+        DETAILS: ${{ inputs.details }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        echo "::add-mask::$WEBHOOK_URL"
+
+        APP_NAME="${APP_NAME:-${GITHUB_REPOSITORY#*/}}"
+        STATUS="$(echo "$STATUS" | tr '[:upper:]' '[:lower:]')"
+
+        case "$STATUS" in
+          success)   COLOR="#2EB67D"; ICON=":white_check_mark:"; STATUS_TEXT="vellukka" ;;
+          cancelled) COLOR="#ECB22E"; ICON=":warning:"; STATUS_TEXT="avbroten" ;;
+          failure)   COLOR="#E01E5A"; ICON=":x:"; STATUS_TEXT="feila" ;;
+          *)         COLOR="#E01E5A"; ICON=":x:"; STATUS_TEXT="$STATUS" ;;
+        esac
+
+        TITLE="$ICON Utrulling av *$APP_NAME*"
+        if [ -n "$VERSION" ]; then TITLE="$TITLE \`$VERSION\`"; fi
+        TITLE="$TITLE: *$STATUS_TEXT*"
+
+        PAYLOAD="$(jq -n \
+          --arg color "$COLOR" \
+          --arg title "$TITLE" \
+          --arg details "$DETAILS" \
+          --arg app "$APP_NAME" \
+          --arg version "$VERSION" \
+          --arg status "$STATUS_TEXT" \
+          --arg run_url "$RUN_URL" \
+          --arg actor "$GITHUB_ACTOR" \
+          --arg ref "$GITHUB_REF_NAME" \
+          '{
+            text: "Utrulling av \($app) \($version): \($status)",
+            attachments: [{
+              color: $color,
+              blocks: (
+                [{type: "section", text: {type: "mrkdwn", text: $title}}]
+                + (if $details != "" then [{type: "section", text: {type: "mrkdwn", text: $details}}] else [] end)
+                + [{type: "context", elements: [{type: "mrkdwn", text: "<\($run_url)|Sjå køyringa> · \($ref) · starta av \($actor)"}]}]
+              )
+            }]
+          }')"
+
+        curl --silent --show-error --fail --retry 3 \
+          -X POST -H "Content-Type: application/json" \
+          --data "$PAYLOAD" "$WEBHOOK_URL"
