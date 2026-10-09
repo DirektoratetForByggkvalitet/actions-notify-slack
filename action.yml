@@ -43,7 +43,7 @@ runs:
         case "$STATUS" in
           success)   COLOR="#2EB67D"; ICON=":white_check_mark:"; STATUS_TEXT="vellukka" ;;
           cancelled) COLOR="#ECB22E"; ICON=":warning:"; STATUS_TEXT="avbroten" ;;
-          failure)   COLOR="#E01E5A"; ICON=":x:"; STATUS_TEXT="feila" ;;
+          failure)   COLOR="#E01E5A"; ICON=":x:"; STATUS_TEXT="gjekk gæli" ;;
           *)         COLOR="#E01E5A"; ICON=":x:"; STATUS_TEXT="$STATUS" ;;
         esac
 
