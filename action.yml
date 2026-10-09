@@ -68,7 +68,6 @@ runs:
           --arg actor "$GITHUB_ACTOR" \
           --arg ref "$GITHUB_REF_NAME" \
           '{
-            text: $text,
             attachments: [{
               color: $color,
               blocks: (
