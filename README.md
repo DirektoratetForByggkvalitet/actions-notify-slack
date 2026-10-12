@@ -26,10 +26,12 @@ Sends a deployment notification to a Slack incoming webhook. The message has a c
   if: always()
   uses: DirektoratetForByggKvalitet/actions-notify-slack@main
   with:
-    webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-    version: ${{ github.sha }}
+    webhook-url: ${{ secrets.ARKITEKTUM_SLACK_CICD_WEBHOOK_URL }}
+    version: 1.0.0
     environment: prod
 ```
+
+The `ARKITEKTUM_SLACK_CICD_WEBHOOK_URL` webhook url is added as an organization secret in the DiBK Github organization, and is available in all repositories.
 
 ¹ GitHub does not expose the job's `environment:` name to actions, so set `environment` explicitly. It is only filled in automatically for workflows triggered by a `deployment` event.
 
