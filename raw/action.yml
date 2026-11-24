@@ -1,0 +1,60 @@
+name: Slack message
+description: Sends a more generic Slack message.
+
+inputs:
+  webhook-url:
+    description: Slack incoming webhook URL. Pass it from a secret.
+    required: true
+  status:
+    description: Status color (success, failure, cancelled). Defaults to job.status.
+    required: false
+    default: ""
+  details:
+    description: Free-text details to include in the message (Slack mrkdwn supported).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validation
+      if: ${{ inputs.details == '' }}
+      shell: bash
+      run: |
+        echo "::error::details is required"
+    - name: Send Slack notification
+      shell: bash
+      env:
+        WEBHOOK_URL: ${{ inputs.webhook-url }}
+        STATUS: ${{ inputs.status || job.status }}
+        DETAILS: ${{ inputs.details }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        echo "::add-mask::$WEBHOOK_URL"
+
+        STATUS="$(echo "$STATUS" | tr '[:upper:]' '[:lower:]')"
+
+        case "$STATUS" in
+          success)   COLOR="#2EB67D" ;;
+          cancelled) COLOR="#ECB22E" ;;
+          *)         COLOR="#E01E5A" ;;
+        esac
+
+        PAYLOAD="$(jq -n \
+          --arg color "$COLOR" \
+          --arg details "$DETAILS" \
+          --arg run_url "$RUN_URL" \
+          --arg actor "$GITHUB_ACTOR" \
+          --arg ref "$GITHUB_REF_NAME" \
+          '{
+            attachments: [{
+              color: $color,
+              blocks: (
+                [{type: "section", text: {type: "mrkdwn", text: $details}}]
+                + [{type: "context", elements: [{type: "mrkdwn", text: "<\($run_url)|Sjå køyringa> · \($ref) · starta av \($actor)"}]}]
+              )
+            }]
+          }')"
+
+        curl --silent --show-error --fail --retry 3 \
+          -X POST -H "Content-Type: application/json" \
+          --data "$PAYLOAD" "$WEBHOOK_URL"
